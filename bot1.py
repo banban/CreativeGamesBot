@@ -77,12 +77,32 @@ class Bot:
         if bool(update.callback_query):
             if update.callback_query.data == str(END):
                 return self.stop(update, context)
-            if update.callback_query.data == str(TRADER):
+            elif update.callback_query.data == str(TRADER):
                 return update.callback_query.message.reply_text('Good luck in trading!')
-            if update.callback_query.data == str(MINER):
+            elif update.callback_query.data == str(MINER):
                 return update.callback_query.message.reply_text('Good luck in mining!')
+            elif update.callback_query.data == str(TRADING):
+                image_path = "./trading.gif"
+                if (os.path.isfile(image_path)):
+                    image_message = context.bot.send_animation(
+                        chat_id=update.callback_query.message.chat_id, 
+                        animation=open(image_path, 'rb'),
+                        caption="https://coinmarketcap.com/"
+                    )
+                    context.chat_data[PAGE_MASSAGES].append(image_message.message_id)
+            elif update.callback_query.data == str(MINING):
+                image_path = "./mining.gif"
+                if (os.path.isfile(image_path)):
+                    image_message = context.bot.send_animation(
+                        chat_id=update.callback_query.message.chat_id, 
+                        animation=open(image_path, 'rb'),
+                        caption="https://www.nicehash.com/marketplace"
+                    )
+                    context.chat_data[PAGE_MASSAGES].append(image_message.message_id)
+
         elif bool(update.message):
             replay_game = update.message.reply_game(self.games[0])
+            #context.chat_data[PAGE_MASSAGES].append(replay_game.message_id)
             try:
                 # return the score of the specified user and several of their neighbors in a game.
                 scores = context.bot.get_game_high_scores(chat_id=replay_game.chat_id,
@@ -91,7 +111,8 @@ class Bot:
                 _text = "Here is top list of players:"
                 for score in scores:
                     _text += f"\n No: {score.position}, User: {score.user.first_name +' '+ score.user.last_name}, Score: {score.score}"
-                update.message.reply_text(text=_text)
+                top_list_message = update.message.reply_text(text=_text)
+                context.chat_data[PAGE_MASSAGES].append(top_list_message.message_id)
             except:
                 pass
             return replay_game
@@ -193,6 +214,14 @@ class Bot:
             chat_data[PAGE_MASSAGES] = []
         chat_data[PAGE_MASSAGES].append(reply.message_id)
 
+    def handle_message(self, update: Update, context: CallbackContext):
+        user_message = str(update.message.text).lower()
+        if user_message.strip('!') in ("hello", "hi"):
+            response = f"🤟G'Day {update.message.from_user.first_name}!"
+        else:
+            response = "😏hmm, looks like you need some /help"
+        update.message.reply_text(response)
+
     def run(self) -> None:
         """Run the bot."""
         # Create the Updater and pass it your bot's token.
@@ -204,8 +233,11 @@ class Bot:
         dp.add_handler(CommandHandler('stop', self.stop))
         dp.add_handler(CommandHandler("shuffle", self.play_shuffle))
         dp.add_handler(CallbackQueryHandler(self.start, pattern='^' +
-                       str(TRADER) + '|' + str(MINER) + '|' + str(END) + '$'))
+                       str(TRADER) + '|' + str(MINER) + '|' +
+                       str(TRADING) + '|' + str(MINING) + '|' +
+                       str(END) + '$'))
         dp.add_handler(CallbackQueryHandler(self.play_button))
+        #dp.add_handler(MessageHandler(Filters.text, self.handle_message))
         dp.add_error_handler(self.error)
 
         # # Callback handlers
