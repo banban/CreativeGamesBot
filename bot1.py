@@ -24,7 +24,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 # State definitions for top level conversation
-TRADER, MINER, TRADING, MINING, PAGE_MASSAGES = map(chr, range(5))
+TRADER, MINER, SALING, BUYING, PROCESSING, FARMING, PAGE_MASSAGES = map(chr, range(7))
 # Shortcut for ConversationHandler.END
 END = ConversationHandler.END
 
@@ -34,11 +34,11 @@ class Bot:
         self.games = ['MinerVsTrader']
         #list of games to play randomly
         self.html5_games = [
-            "https://yenots.itch.io/crypto-catch"
-            , "https://cdno.itch.io/flappy-coin"
-            , "https://bitcoinsv.itch.io/bitcoin-versus-crypto"
-            , "https://playcurious.games/games/blockchain-battle/"
-            , "https://playcurious.games/games/blockchain-battle/"
+            "https://t.me/WorldOfCryptoCurrencyBot?start",
+            "https://yenots.itch.io/crypto-catch",
+            "https://cdno.itch.io/flappy-coin",
+            "https://bitcoinsv.itch.io/bitcoin-versus-crypto",
+            "https://playcurious.games/games/blockchain-battle/",
         ]
 
     def stop(self, update: Update, context: CallbackContext) -> int:
@@ -76,45 +76,59 @@ class Bot:
         #print("user entered")
         if bool(update.callback_query):
             if update.callback_query.data == str(END):
-                return self.stop(update, context)
+                try:
+                    # return the score of the specified user and several of their neighbors in a game.
+                    scores = context.bot.get_game_high_scores(chat_id=update.callback_query.message.chat_id,
+                                                            message_id=update.callback_query.message.message_id,
+                                                            user_id=update.callback_query.message.from_user.id)
+                    _text = "Here is top list of players:"
+                    for score in scores:
+                        _text += f"\n No: {score.position}, User: {score.user.first_name +' '+ score.user.last_name}, Score: {score.score}"
+                    top_list_message = update.message.reply_text(text=_text)
+                    context.chat_data[PAGE_MASSAGES].append(top_list_message.message_id)
+                except:
+                    pass
+                #return self.stop(update, context)
+
             elif update.callback_query.data == str(TRADER):
-                return update.callback_query.message.reply_text('Good luck in trading!')
-            elif update.callback_query.data == str(MINER):
-                return update.callback_query.message.reply_text('Good luck in mining!')
-            elif update.callback_query.data == str(TRADING):
                 image_path = "./trading.gif"
                 if (os.path.isfile(image_path)):
                     image_message = context.bot.send_animation(
                         chat_id=update.callback_query.message.chat_id, 
+                        reply_to_message_id=update.callback_query.message.message_id,
                         animation=open(image_path, 'rb'),
                         caption="https://coinmarketcap.com/"
                     )
                     context.chat_data[PAGE_MASSAGES].append(image_message.message_id)
-            elif update.callback_query.data == str(MINING):
+                update.callback_query.message.reply_text('Good luck in trading!')
+
+            elif update.callback_query.data == str(MINER):
                 image_path = "./mining.gif"
                 if (os.path.isfile(image_path)):
                     image_message = context.bot.send_animation(
                         chat_id=update.callback_query.message.chat_id, 
+                        reply_to_message_id=update.callback_query.message.message_id,
                         animation=open(image_path, 'rb'),
                         caption="https://www.nicehash.com/marketplace"
                     )
                     context.chat_data[PAGE_MASSAGES].append(image_message.message_id)
+                update.callback_query.message.reply_text('Good luck in mining!')
 
+            elif update.callback_query.data in [str(SALING),str(BUYING),str(PROCESSING),str(FARMING)]:
+                # grant player random score
+                try:
+                    context.bot.set_game_score(
+                        chat_id=update.callback_query.message.chat_id, 
+                        user_id=update.callback_query.message.from_user.id,
+                        message_id=update.callback_query.message.message_id,
+                        score=random.randint(0, 100),
+                        force=True)
+                except:
+                    print(f"Error:{context.error}")
+                    pass
+            return None
         elif bool(update.message):
             replay_game = update.message.reply_game(self.games[0])
-            #context.chat_data[PAGE_MASSAGES].append(replay_game.message_id)
-            try:
-                # return the score of the specified user and several of their neighbors in a game.
-                scores = context.bot.get_game_high_scores(chat_id=replay_game.chat_id,
-                                                          message_id=replay_game.message_id,
-                                                          user_id=update.message.from_user.id)
-                _text = "Here is top list of players:"
-                for score in scores:
-                    _text += f"\n No: {score.position}, User: {score.user.first_name +' '+ score.user.last_name}, Score: {score.score}"
-                top_list_message = update.message.reply_text(text=_text)
-                context.chat_data[PAGE_MASSAGES].append(top_list_message.message_id)
-            except:
-                pass
             return replay_game
 
     def play_shuffle(self, update: Update, context: CallbackContext):
@@ -126,32 +140,10 @@ class Bot:
         update.message.reply_text(dish)
 
     def play_button(self, update: Update, context: CallbackContext):
-        #print("play button pressed")
+        #print("play button pressed in chut group")
         query = update.callback_query
         
-        # admin mode
-        if query.message:
-            buttons = [
-                [
-                    InlineKeyboardButton(
-                        text='💰Trader', callback_data=str(TRADER)),
-                    InlineKeyboardButton(
-                        text='⛏Miner', callback_data=str(MINER)),
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=f"📉Trading", callback_data=str(TRADING)),
-                    InlineKeyboardButton(
-                        text=f"⛓Mining", callback_data=str(MINING)),
-                ],
-                [
-                    InlineKeyboardButton(text='⏹Exit', callback_data=str(END)),
-                ],
-            ]
-            keyboard = InlineKeyboardMarkup(buttons)  # , reply_markup=keyboard
-            return query.message.reply_text(text=f"Please choose your role...", reply_markup=keyboard)
-
-        # user mode in group
+        # HTML5 mode in group
         if query.inline_message_id:
             game = query.game_short_name
             ilmid = query.inline_message_id
@@ -171,6 +163,31 @@ class Bot:
             url = random.choice(self.html5_games)
             return context.bot.answer_callback_query(query.id, text=game, url=url)
 
+        # direct dialogue mode
+        elif query.message:
+            buttons = [
+                [
+                    InlineKeyboardButton(
+                        text='📉Trader', callback_data=str(TRADER)),
+                    InlineKeyboardButton(
+                        text='⛏Miner', callback_data=str(MINER)),
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=f"🔽Sale", callback_data=str(SALING)),
+                    InlineKeyboardButton(
+                        text=f"🔼Buy", callback_data=str(BUYING)),
+                    InlineKeyboardButton(
+                        text=f"⛓Mine", callback_data=str(PROCESSING)),
+                    InlineKeyboardButton(
+                        text=f"🔋Farm", callback_data=str(FARMING)),
+                ],
+                [
+                    InlineKeyboardButton(text='⏹Exit', callback_data=str(END)),
+                ],
+            ]
+            keyboard = InlineKeyboardMarkup(buttons)  # , reply_markup=keyboard
+            return query.message.reply_text(text=f"Please choose your role...", reply_markup=keyboard)
         # if query.message:
         #     mid = str(query.message.message_id)
         #     cid = str(query.message.chat.id)
@@ -207,7 +224,7 @@ class Bot:
             "\n-Player has to choose role: Miner or Trader"
             "\n-Trader generates transactions in blockchain and choose which Miner will process them"
             "\n-Miner promotes commission rates for Traders, process transactions, and collect coins commission."
-            "\n-The winner is the player with maximum coins score."
+            "\n-The winner is the player with maximum coins scored."
         )
         chat_data = context.chat_data
         if PAGE_MASSAGES not in chat_data:
@@ -234,7 +251,8 @@ class Bot:
         dp.add_handler(CommandHandler("shuffle", self.play_shuffle))
         dp.add_handler(CallbackQueryHandler(self.start, pattern='^' +
                        str(TRADER) + '|' + str(MINER) + '|' +
-                       str(TRADING) + '|' + str(MINING) + '|' +
+                       str(SALING) + '|' + str(BUYING) + '|' +
+                       str(PROCESSING) + '|' + str(FARMING) + '|' +
                        str(END) + '$'))
         dp.add_handler(CallbackQueryHandler(self.play_button))
         #dp.add_handler(MessageHandler(Filters.text, self.handle_message))
